@@ -1,5 +1,6 @@
 ﻿using Azure.Messaging;
 using CitiesGame.Entities;
+using CitiesGame.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -109,30 +110,29 @@ namespace CitiesGame.Controllers
 
         // POST
         [HttpPost("word")]
-        public async Task<IActionResult> MakeMove(int sessionId, int userId, string word)
+        public async Task<IActionResult> MakeMove([FromBody] MakeMoveRequest request)
         {
             // Загрузка сессии с ходами
             var session = await _context.Sessions
                 .Include(s => s.Moves)
-                .FirstOrDefaultAsync(s => s.Id == sessionId);
+                .FirstOrDefaultAsync(s => s.Id == request.SessionId);
 
             // Проверки
             if (session == null) return NotFound("Игра не найдена");
             if (!session.IsActive) return BadRequest("Игра окончена");
-            if (session.CurrentTurnUserId != userId) return BadRequest("Сейчас не ваш ход!");
+            if (session.CurrentTurnUserId != request.UserId) return BadRequest("Сейчас не ваш ход!");
 
-            word = word.Trim(); // Чтобы убрать пробелы
-            if (string.IsNullOrWhiteSpace(word)) return BadRequest("Слово не может быть пустым");
+            string cleanWord = request.Word.Trim();
 
             // Проверка было ли слово в этой игре (без учета регистра)
-            if (session.Moves.Any(m => m.Word.ToLower() == word.ToLower())) return BadRequest("Это слово уже было!");
+            if (session.Moves.Any(m => m.Word.ToLower() == cleanWord.ToLower())) return BadRequest("Это слово уже было!");
 
             // Проверка буквы на которую нужно ответить
             var lastMove = session.Moves.LastOrDefault();
             if (lastMove != null)
             {
                 char requiredChar = GetLastValidLetter(lastMove.Word); // Буква на которую следует отвечать
-                char firstChar = char.ToLower(word[0]); // первая буква слова
+                char firstChar = char.ToLower(cleanWord[0]); // первая буква слова
 
                 if (requiredChar != firstChar) return BadRequest($"Слово должно начинаться на букву '{requiredChar}'");
             }
@@ -141,20 +141,20 @@ namespace CitiesGame.Controllers
             // фикс. ход
             var move = new GameMove
             {
-                UserId = userId,
-                GameSessionId = sessionId,
-                Word = word
+                UserId = request.UserId,
+                GameSessionId = request.SessionId,
+                Word = cleanWord
             };
             _context.Moves.Add(move);
 
             // Передача хода другому игроку
-            session.CurrentTurnUserId = (session.Player1Id == userId)
+            session.CurrentTurnUserId = (session.Player1Id == request.UserId)
                 ? session.Player2Id!.Value
                 : session.Player1Id;
 
             await _context.SaveChangesAsync();
 
-            return Ok(new {Message = "Ход принят", Word = word });
+            return Ok(new {Message = "Ход принят", Word = cleanWord });
         }
 
         // Проверка валид. буквы (фильтр по ы,ъ,ь)

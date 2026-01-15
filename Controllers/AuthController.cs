@@ -1,4 +1,5 @@
 ﻿using CitiesGame.Entities;
+using CitiesGame.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,10 +19,10 @@ namespace CitiesGame.Controllers
 
         // POST (регистрация)
         [HttpPost("register")]
-        public async Task<IActionResult> Register(string username, string password)
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             // Проверка на наличие такого пользователя
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
 
             if (existingUser != null)
             {
@@ -31,8 +32,8 @@ namespace CitiesGame.Controllers
             // Создание пользователя
             var newUser = new User()
             {
-                Username = username,
-                Password = password
+                Username = request.Username,
+                Password = request.Password
             };
 
             // Сохранение юзера
@@ -46,10 +47,10 @@ namespace CitiesGame.Controllers
 
         // POST (авторизация)
         [HttpPost("login")]
-        public async Task<IActionResult> Login(string username, string password)
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             // Поиск по имени и паролю
-            var user = await _context.Users.FirstOrDefaultAsync( u => u.Username == username & u.Password == password);
+            var user = await _context.Users.FirstOrDefaultAsync( u => u.Username == request.Username && u.Password == request.Password);
 
             // Если не нашли, то проброс 401
             if (user == null)
